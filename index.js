@@ -17,6 +17,7 @@ mongoose.connect(
 
 
 io.on("connection", (socket) => {
+    console.log('user connected');
     require("./controllers/auth")(socket, io)
 })
 

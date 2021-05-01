@@ -9,6 +9,7 @@ module.exports = (socket) => {
 
         socket.on('auth/REGISTRATION', (data)=>{
             if(data.name && data.name.length > 1){
+
                 console.log('registration', data.name);
                 let avatarColors = ["#5d4038", "#5c6bc0", "#ec417b", "#689f39", "#c2175b", "#018a7a", "#5c6bc0", "#0288d1", "#00579c", "#bf360c", "#7e57c2", "#00887a"]
                 let getRandomInt = (max) => {
@@ -20,6 +21,7 @@ module.exports = (socket) => {
 
                 let userId = mongoose.Types.ObjectId()
                 let chatId = mongoose.Types.ObjectId()
+                let avatarColor = getRandomColor()
                 let currentDate = new Date()
 
                 const token = jwt.sign(
@@ -35,7 +37,9 @@ module.exports = (socket) => {
                     _id: chatId,
                     creator: userId,
                     name: data.name,
+                    avatarColor: avatarColor,
                     members: [userId],
+                    lastMessage: {author: data.name, text: "Chat created", date: currentDate},
                     totalMembers: 1,
                     creationDate: currentDate
                 })
@@ -45,7 +49,7 @@ module.exports = (socket) => {
                     name: data.name,
                     chats: [chatId],
                     token: token,
-                    avatarColor: getRandomColor(),
+                    avatarColor: avatarColor,
                     regDate: currentDate
                 })
 
@@ -54,7 +58,7 @@ module.exports = (socket) => {
                     _id: mongoose.Types.ObjectId(),
                     creator: userId,
                     creatorName: data.name,
-                    creatorColor: 'none',
+                    creatorColor: avatarColor,
                     chat: chatId,
                     type: 'notification',
                     text: 'Chat created',
@@ -65,13 +69,23 @@ module.exports = (socket) => {
 
                 Promise.all([newChat.save(), User.save(), newMessage.save()])
                     .then(response =>{
-                        socket.emit('auth/REGISTRATION_SUCCESS', {token: response[1].token})
+                        socket.emit('auth/REGISTRATION_SUCCESS', {
+                            token: response[1].token,
+                            name: data.name,
+                            avatarColor: avatarColor,
+                            chats: [{
+                                _id: response[0]._id,
+                                name: data.name,
+                                avatarColor: avatarColor,
+                                lastMessage: {author: data.name, text: "Chat created", date: currentDate},
+                                totalMembers: 1
+                            }]
+                        })
                         console.log(response)
                     })
                     .catch(error=>{
-                        socket.emit('auth/REGISTRATION_SUCCESS', {token: response[1].token})
+                        socket.emit('auth/REGISTRATION_ERROR', {error: "server error"})
                     })
-                socket.emit('auth/REGISTRATION_SUCCESS', {userData: data.name})
             }
             else{
                 socket.emit('auth/REGISTRATION_ERROR', {error: "name is required"})
@@ -80,16 +94,30 @@ module.exports = (socket) => {
 
 
 
-        socket.on('auth/AUTH', (data) =>{
+        socket.on('auth/AUTH', async (data) =>{
 
             if(data.token){
                 const decoded = jwt.verify(data.token, 'jerjg')
+
+                let chatsId = await ChatUser
+                    .findOne({_id: decoded.userId})
+                    .then(doc => (doc.chats))
+                let chatsList = await Chat.find({_id: chatsId}).then(docs=>docs)
+
+                chatsList = chatsList.map((item) =>({
+                    _id: item._id,
+                    name: item.name,
+                    avatarColor: item.avatarColor,
+                    lastMessage: item.lastMessage,
+                    totalMembers: item.totalMembers
+                }))
+
                 ChatUser
                     .findOne({_id: decoded.userId})
                     .then(doc=>{
                         socket.emit('auth/AUTH_INFO',
                             {name: doc.name,
-                            chats: doc.chats,
+                            chats: chatsList,
                             avatarColor: doc.avatarColor
                             })
                     })
