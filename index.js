@@ -19,6 +19,7 @@ mongoose.connect(
 io.on("connection", (socket) => {
     console.log('user connected');
     require("./controllers/auth")(socket, io)
+    require("./controllers/chat")(socket, io)
 })
 
 const PORT = 8081;
