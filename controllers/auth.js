@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const ChatUser = require('../models/user')
 const Chat = require('../models/chat')
-const Message = require('../models/message')
 const jwt = require("jsonwebtoken");
 
 
@@ -54,20 +53,10 @@ module.exports = (socket) => {
                 })
 
 
-                const newMessage = new Message({
-                    _id: mongoose.Types.ObjectId(),
-                    creator: userId,
-                    creatorName: data.name,
-                    creatorColor: avatarColor,
-                    chat: chatId,
-                    type: 'notification',
-                    text: 'Chat created',
-                    date: currentDate
-                })
 
 
 
-                Promise.all([newChat.save(), User.save(), newMessage.save()])
+                Promise.all([newChat.save(), User.save()])
                     .then(response =>{
                         socket.emit('auth/REGISTRATION_SUCCESS', {
                             token: response[1].token,

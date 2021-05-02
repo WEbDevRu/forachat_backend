@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const ChatUser = require('../models/user')
 const Chat = require('../models/chat')
-const Message = require('../models/message')
 const jwt = require("jsonwebtoken");
 
 
@@ -25,7 +24,6 @@ module.exports = (socket, io) => {
     socket.on('chat/LEAVE',  async (data)=>{
         socket.name = data.token
         await socket.leave(data.chatId)
-
         let sockets = await io.in(data.chatId).fetchSockets()
         sockets = sockets.map(item=>  jwt.verify(item.name, 'jerjg').userId)
         ChatUser
@@ -34,6 +32,12 @@ module.exports = (socket, io) => {
                 let onlineUsers = docs.map(item=> ({userId: item.userId, name: item.name, avatarColor: item.avatarColor}))
                 io.sockets.to(data.chatId).emit('chat/ONLINE_USERS', {list: onlineUsers})
             })
+    })
+
+
+    socket.on('disconnect', () => {
+        console.log(socket.name)
+        console.log('user disconnected');
     })
 
 
@@ -69,12 +73,31 @@ module.exports = (socket, io) => {
                     console.log('joined')
                 })
             })
-
-
         }
+    })
 
 
+    socket.on('chat/NEW_MESSAGE', async (data) =>{
+        let userId = jwt.verify(data.token, 'jerjg').userId
+        let chatId = data.chatId
+        let message = data.text
+        let user = await ChatUser
+            .findOne({_id: userId})
+            .then(doc => (doc))
 
+
+        message = { creator: userId,
+                    creatorName: user.name,
+                    creatorColor: user.avatarColor,
+                    chat: chatId,
+                    type: "normal",
+                    text: message,
+                    date: new Date()
+        }
+        console.log(message)
+
+        Chat.findOneAndUpdate()
+        io.sockets.to(data.chatId).emit('chat/NEW_MESSAGE_POSTED', {message: message})
     })
 
 
